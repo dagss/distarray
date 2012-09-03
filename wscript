@@ -44,17 +44,17 @@ def build(bld):
     #
     # Main shared library
     #
-    bld(target='hello',
-        source=['src/hello.c'],
+    bld(target='chello',
+        source=['src/chello.c'],
         includes=['src'],
         use='C99',
         features='c cshlib')
 
-    #bld(source=(['wavemoth/butterfly.pyx']),
-    #    includes=['src'],
-    #    target='butterfly',
-    #    use='NUMPY fcshlib wavemoth',
-    #    features='c pyext cshlib')
+    bld(source=(['distarray/hello.pyx']),
+        includes=['src'],
+        target='hello',
+        use='NUMPY chello',
+        features='c pyext cshlib')
 
 
 # vim:ft=python

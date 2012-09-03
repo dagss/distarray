@@ -37,15 +37,18 @@ def configure(conf):
     conf.check_cython_version(minver=(0,11,1))
     conf.check_tool('inplace', tooldir='tools')
 
+    conf.env.CFLAGS_C99 = ['-std=c99']
+
+
 def build(bld):
     #
     # Main shared library
     #
-    #bld(target='wavemoth',
-    #    source=['src/butterfly.c.in'],
-    #    includes=['src'],
-    #    use='C99',
-    #    features='c cshlib')
+    bld(target='hello',
+        source=['src/hello.c'],
+        includes=['src'],
+        use='C99',
+        features='c cshlib')
 
     #bld(source=(['wavemoth/butterfly.pyx']),
     #    includes=['src'],

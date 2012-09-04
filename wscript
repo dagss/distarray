@@ -23,6 +23,7 @@ def configure(conf):
     conf.add_os_flags('STLIBPATH')
     conf.add_os_flags('CFLAGS')
     conf.add_os_flags('LINKFLAGS')
+    conf.add_os_flags('CYTHONFLAGS')
 
     conf.load('compiler_c')
     conf.load('compiler_fc')
@@ -37,6 +38,8 @@ def configure(conf):
     conf.check_cython_version(minver=(0,11,1))
     conf.check_tool('inplace', tooldir='tools')
 
+    conf.check_mpi4py()
+
     conf.env.CFLAGS_C99 = ['-std=c99']
 
 
@@ -44,17 +47,30 @@ def build(bld):
     #
     # Main shared library
     #
-    bld(target='chello',
-        source=['src/chello.c'],
+    bld(target='distarray',
+        source=['src/distarray.c'],
         includes=['src'],
         use='C99',
         features='c cshlib')
 
-    bld(source=(['distarray/hello.pyx']),
+    bld(source=(['distarray/_distarray.pyx']),
         includes=['src'],
-        target='hello',
-        use='NUMPY chello',
+        target='_distarray',
+        use='NUMPY MPI4PY distarray',
         features='c pyext cshlib')
+
+
+from waflib.Configure import conf
+from os.path import join as pjoin
+from waflib import TaskGen
+
+@conf
+def check_mpi4py(conf):
+    conf.start_msg("Checking mpi4py includes")
+    (mpi4py_include,) = conf.get_python_variables(
+            ['mpi4py.get_include()'], ['import mpi4py'])
+    conf.env.INCLUDES_MPI4PY = mpi4py_include
+    conf.end_msg('ok (%s)' % mpi4py_include)
 
 
 # vim:ft=python

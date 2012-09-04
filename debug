@@ -1,2 +1,4 @@
+export CYTHONFLAGS=--fast-fail
+export CC=mpicc
 export CFLAGS='-O0 -g'
 ./waf configure --inplace

@@ -1,1 +1,2 @@
-# empty
+
+from ._distarray import Grid

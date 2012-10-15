@@ -20,3 +20,21 @@ def test_grid_bad_size(comm):
     ranks = np.arange(8, dtype=np.intc).reshape(2, 4)
     with assert_raises(ValueError):
         distarray.Grid(comm, ranks)
+
+@mpi(2)
+def test_chunked_axis(comm):
+    grid = distarray.Grid(comm, (2,))
+    dist = distarray.Distribution(grid, [
+        distarray.ChunkedAxis([0, 200, 400])
+        ], [1])
+    local = np.arange(20)[None, :].copy()
+
+    # local_to_global
+    global_ = dist.local_to_global(local)
+    start = 200 * comm.Get_rank()
+    assert np.all(global_[0, :] == np.arange(start, start + 20))
+
+    # global_to_rank
+    global_ = np.arange(195, 205)[None, :].copy()
+    assert np.all(dist.global_to_rank_coords(global_) ==
+                  [0, 0, 0, 0, 0, 1, 1, 1, 1, 1])

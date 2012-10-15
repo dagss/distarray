@@ -1,2 +1,2 @@
 
-from ._distarray import Grid
+from ._distarray import *

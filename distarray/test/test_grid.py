@@ -10,7 +10,10 @@ def test_grid(comm):
     ranks = np.arange(6, dtype=np.intc).reshape(2, 3)
     g = distarray.Grid(comm, ranks)
     ranks[...] = 0
-    assert 5 == g.get_rank((1, 2))
+    for i in range(2):
+        for j in range(3):
+            assert 3 * i + j == g.get_rank((i, j))
+            assert g.find_rank(3 * i + j) == (i, j)
 
 @mpi(6)
 def test_grid_bad_size(comm):

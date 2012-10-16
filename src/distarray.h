@@ -58,9 +58,9 @@ typedef struct {
     void *_trailing_data[0];
 } distarray_plan_t;
 
-void distarray_send_counts(distarray_distribution_t *from_dist,
-                           distarray_distribution_t *to_dist,
-                           int from_rank, int comm_size, int *counts);
+int distarray_send_counts(distarray_distribution_t *from_dist,
+                          distarray_distribution_t *to_dist,
+                          int from_rank, int comm_size, int *counts);
 distarray_plan_t *distarray_plan_redistribution(distarray_distribution_t *from_dist,
                                                 distarray_distribution_t *to_dist);
 void distarray_destroy_plan(distarray_plan_t *plan);

@@ -87,17 +87,23 @@ def test_chunked_execute(comm):
     plan = RedistributionPlan(dist_a, dist_b, np.double)
     arr_a = np.ones(dist_a.local_shape()) * rank
     arr_b = np.empty(dist_b.local_shape()) * np.nan
-#    mprint(comm, arr_a)
-    #plan.execute(arr_a, arr_b)
-    mprint(comm, arr_b)
+    plan.execute(arr_a, arr_b)
+
+    #mprint(comm, arr_b)
+
+    if rank == 0:
+        assert np.all(arr_b[:10, :5] == 0)
+        assert np.all(arr_b[:10, 5:] == 1)
+        assert np.all(arr_b[10:, :5] == 3)
+        assert np.all(arr_b[10:, 5:] == 4)
+    elif rank == 1 or rank == 2:
+        assert np.all(arr_b[:10, :] == 2)
+        assert np.all(arr_b[10:, :] == 5)
+    elif rank == 3:
+        assert np.all(arr_b[:, :5] == 3)
+        assert np.all(arr_b[:, 5:] == 4)
+    elif rank == 4 or rank == 5:
+        assert np.all(arr_b == 5)
     
-## @mpi(6)
-## def test_chunked_axis_2d(comm):
-##     # 2D
-##     grid = Grid(comm, (2, 3))
-##     dist = Distribution(grid, [
-##         ChunkedAxis([0, 100, 200])
-##         ChunkedAxis([0, 100, 200, 300])
-##         ], [300, 1])
 
     

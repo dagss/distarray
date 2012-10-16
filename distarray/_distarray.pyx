@@ -46,9 +46,9 @@ cdef extern from "distarray.h":
                                                     distarray_distribution_t *to_dist)
     void distarray_destroy_plan(distarray_plan_t *plan)
     int distarray_execute(distarray_plan_t *plan, void *from_buf, void *to_buf)
-    void distarray_send_counts(distarray_distribution_t *from_dist,
-                               distarray_distribution_t *to_dist,
-                               int from_rank, int comm_size, int *counts)
+    int distarray_send_counts(distarray_distribution_t *from_dist,
+                              distarray_distribution_t *to_dist,
+                              int from_rank, int comm_size, int *counts)
 
     
 
@@ -179,7 +179,8 @@ cdef class RedistributionPlan:
             raise ValueError()
         if (<object>to_buf).shape != self.to_dist.local_shape() or to_buf.dtype != self.dtype:
             raise ValueError()
-        distarray_execute(self.plan, <void*>from_buf.data, <void*>to_buf.data)
+        if distarray_execute(self.plan, <void*>from_buf.data, <void*>to_buf.data) != 0:
+            raise RuntimeError()
 
 def compute_send_counts(int rank, Distribution from_dist, Distribution to_dist):
     cdef int n = from_dist.grid.comm.Get_size()

@@ -220,12 +220,8 @@ void distarray_destroy_plan(distarray_plan_t *plan) {
     free(plan);
 }
 
-void distarray_send_counts(distarray_distribution_t *from_dist,
-                           distarray_distribution_t *to_dist,
-                           int from_rank, int comm_size, int *counts) {
+{% macro send_sort() %}
     assert(from_dist->grid->ndim == 2); /* TODO */
-
-    memset(counts, 0, sizeof(int) * comm_size);
 
     ptrdiff_t *shape = from_dist->shape;
 
@@ -263,7 +259,7 @@ void distarray_send_counts(distarray_distribution_t *from_dist,
         for (ptrdiff_t i1 = 0; i1 != from_shape[1]; ++i1) {
             grid_coords[1] = grid_coord1[i1];
             int to_rank = distarray_grid_coords_to_rank(to_grid, grid_coords);
-            counts[to_rank] += 1;
+            {{ caller() }}
         }
     }
 
@@ -271,6 +267,50 @@ void distarray_send_counts(distarray_distribution_t *from_dist,
     free(global1);
     free(grid_coord0);
     free(grid_coord1);
+
+{% endmacro %}
+
+int distarray_send_counts(distarray_distribution_t *from_dist,
+                          distarray_distribution_t *to_dist,
+                          int from_rank, int comm_size, int *counts) {
+    
+    memset(counts, 0, sizeof(int) * comm_size);
+    int total = 0;
+
+    {%call send_sort() %}
+      counts[to_rank] += 1;
+      total += 1;
+    {%endcall %}
+
+    return total;
+}
+
+static void _scatter_to_send_buffers(distarray_plan_t *plan, int from_rank, int comm_size,
+                                     void *localbuf, void *sendbuf, int *displs) {
+    char *buf_heads[comm_size];
+    for (int i = 0; i != comm_size; ++i) {
+        buf_heads[i] = (char*)sendbuf + sizeof(double) * displs[i];
+    }
+    distarray_distribution_t *from_dist = plan->from, *to_dist = plan->to;
+    ptrdiff_t ilocal = 0;
+    {% call send_sort() %}
+    *((double*)buf_heads[to_rank]) = ((double*)localbuf)[ilocal++];
+    buf_heads[to_rank] += sizeof(double);
+    {% endcall %}
+}
+
+static void _gather_from_recv_buffers(distarray_plan_t *plan, int from_rank, int comm_size,
+                                      void *localbuf, void *recvbuf, int *displs) {
+    char *buf_heads[comm_size];
+    for (int i = 0; i != comm_size; ++i) {
+        buf_heads[i] = (char*)recvbuf + sizeof(double) * displs[i];
+    }
+    distarray_distribution_t *from_dist = plan->to, *to_dist = plan->from;
+    ptrdiff_t ilocal = 0;
+    {% call send_sort() %}
+    ((double*)localbuf)[ilocal++] = *((double*)(buf_heads[to_rank]));
+    buf_heads[to_rank] += sizeof(double);
+    {% endcall %}
 }
 
 int distarray_execute(distarray_plan_t *plan, void *from_buf, void *to_buf) {
@@ -280,19 +320,39 @@ int distarray_execute(distarray_plan_t *plan, void *from_buf, void *to_buf) {
     if (MPI_Comm_size(comm, &comm_size) != MPI_SUCCESS) return -1;
     if (MPI_Comm_rank(comm, &rank) != MPI_SUCCESS) return -1;
 
-    int *sendcounts = malloc(comm_size * sizeof(int));
-    int *recvcounts = malloc(comm_size * sizeof(int));
+    int *int_buf = malloc(comm_size * sizeof(int) * 4);
+    int *senddispls = int_buf;
+    int *recvdispls = int_buf + comm_size;
+    int *sendcounts = int_buf + 2 * comm_size;
+    int *recvcounts = int_buf + 3 * comm_size;
 
-    distarray_send_counts(plan->from, plan->to, rank, comm_size, sendcounts);
+    int total_send = distarray_send_counts(plan->from, plan->to, rank, comm_size, sendcounts);
     /* To find recvcounts we can simple think about the reverse redistribution */
-    distarray_send_counts(plan->to, plan->from, rank, comm_size, recvcounts);
+    int total_recv = distarray_send_counts(plan->to, plan->from, rank, comm_size, recvcounts);
 
-    for (int i = 0; i != comm_size; ++i) {
-        printf("%d:%d:%d\n", rank, i, sendcounts[i], recvcounts[i]);
+    senddispls[0] = recvdispls[0] = 0;
+    for (int i = 1; i != comm_size; ++i) {
+        senddispls[i] = senddispls[i - 1] + sendcounts[i - 1];
+        recvdispls[i] = recvdispls[i - 1] + recvcounts[i - 1];
     }
 
-    free(sendcounts);
-    free(recvcounts);
+    /* Allocate memory */
+    /* TODO: support other types than double */
+    void *sendbuf = malloc(sizeof(double) * total_send);
+    void *recvbuf = malloc(sizeof(double) * total_recv);
+    memset(sendbuf, 0xff, sizeof(double) * total_send);
+    memset(recvbuf, 0xff, sizeof(double) * total_recv);
+    _scatter_to_send_buffers(plan, rank, comm_size, from_buf, sendbuf, senddispls);
+
+    if (MPI_Alltoallv(sendbuf, sendcounts, senddispls, MPI_DOUBLE,
+                      recvbuf, recvcounts, recvdispls, MPI_DOUBLE,
+                      comm) != MPI_SUCCESS) return -1;
+    _gather_from_recv_buffers(plan, rank, comm_size, to_buf, recvbuf, recvdispls);
+    
+    free(int_buf);
+    free(sendbuf);
+    free(recvbuf);
+    return 0;
 }
 
 

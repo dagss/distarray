@@ -8,6 +8,26 @@ from ..mpiutils import *
 
 import functools
 
+def meq_(comm, expected, got):
+    assert type(expected) is list and len(expected) == comm.Get_size()
+    rank = comm.Get_rank()
+    if got != expected[rank]:
+        raise AssertionError("Rank %d: Expected '%r' but got '%r'" % (
+            rank, expected[rank], got))
+
+def assert_eq_across_ranks(comm, x):
+    lst = comm.gather(x, root=0)
+    if comm.Get_rank() == 0:
+        for i in range(1, len(lst)):
+            y = lst[i]
+            if isinstance(x, np.ndarray) and isinstance(y, np.ndarray):
+                is_equal = np.all(x == y)
+            else:
+                is_equal = (x == y)
+            if not is_equal:
+                raise AssertionError("Rank 0's and %d's result differ: '%r' vs '%r'" %
+                                     (i, x, y))
+
 def format_exc_info():
     import traceback
     type_, value, tb = sys.exc_info()

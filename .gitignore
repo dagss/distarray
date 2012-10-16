@@ -7,3 +7,5 @@
 /.lock-waf*
 /.waf*
 /build/
+
+/src/distarray.c

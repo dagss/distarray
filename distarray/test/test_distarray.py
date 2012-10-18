@@ -1,4 +1,5 @@
-from .common import *
+from ..mpinoseutils import *
+
 from nose.tools import assert_raises
 
 from distarray import Grid, Distribution, ChunkedAxis, RedistributionPlan
@@ -6,7 +7,7 @@ import distarray
 
 import numpy as np
 
-@mpi(6)
+@mpitest(6)
 def test_grid(comm):
     ranks = np.arange(6, dtype=np.intc).reshape(2, 3)
     g = Grid(comm, ranks)
@@ -16,13 +17,13 @@ def test_grid(comm):
             assert 3 * i + j == g.get_rank((i, j))
             assert g.find_rank(3 * i + j) == (i, j)
 
-@mpi(6)
+@mpitest(6)
 def test_grid_bad_size(comm):
     ranks = np.arange(8, dtype=np.intc).reshape(2, 4)
     with assert_raises(ValueError):
         Grid(comm, ranks)
 
-@mpi(2)
+@mpitest(2)
 def test_chunked_axis(comm):
     grid = Grid(comm, (2,))
     dist = Distribution(grid, [
@@ -42,7 +43,7 @@ def test_chunked_axis(comm):
     assert np.all(dist.global_to_rank_coords(global_) ==
                   [0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
 
-@mpi(6)
+@mpitest(6)
 def test_chunked_execute(comm):
     rank = comm.Get_rank()
     grid = Grid(comm, (2, 3))
